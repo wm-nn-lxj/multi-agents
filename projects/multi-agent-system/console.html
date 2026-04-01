@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Console (Standalone)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .header {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header .subtitle { color: #888; font-size: 14px; }
+        
+        .config-panel {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+        }
+        .config-panel label { display: block; margin-bottom: 5px; color: #aaa; }
+        .config-panel input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            margin-bottom: 15px;
+        }
+        .config-panel button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .config-panel button:hover { transform: scale(1.02); }
+        
+        .container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .window {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            height: 450px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .window-header {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .window-header .name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .window-header .status { 
+            font-size: 12px; 
+            padding: 4px 10px; 
+            border-radius: 12px;
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        .window-header .status.working {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+        
+        .window-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .msg {
+            padding: 12px 15px;
+            border-radius: 10px;
+            max-width: 90%;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .msg.user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            align-self: flex-end;
+        }
+        .msg.agent {
+            background: rgba(255, 255, 255, 0.1);
+            align-self: flex-start;
+        }
+        .msg.system {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+            align-self: center;
+            text-align: center;
+            font-size: 12px;
+        }
+        .msg-time { font-size: 10px; opacity: 0.6; margin-top: 5px; }
+        
+        .window-input {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 10px;
+        }
+        .window-input input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            outline: none;
+        }
+        .window-input input::placeholder { color: rgba(255,255,255,0.4); }
+        .window-input button {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 20px;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .window-input button:hover { transform: scale(1.05); }
+        
+        /* Agent颜色 */
+        .product .window-header { border-left: 4px solid #f59e0b; }
+        .architect .window-header { border-left: 4px solid #3b82f6; }
+        .developer .window-header { border-left: 4px solid #10b981; }
+        .reviewer .window-header { border-left: 4px solid #ef4444; }
+        .tester .window-header { border-left: 4px solid #8b5cf6; }
+        .system .window-header { border-left: 4px solid #6b7280; }
+        
+        .window-messages::-webkit-scrollbar { width: 6px; }
+        .window-messages::-webkit-scrollbar-track { background: transparent; }
+        .window-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        
+        @media (max-width: 1200px) { .container { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 Multi-Agent Console</h1>
+        <div class="subtitle">Connect to your Multi-Agent System</div>
+    </div>
+    
+    <div class="config-panel" id="config-panel">
+        <label>Server Address</label>
+        <input type="text" id="server-url" placeholder="http://your-server:9000" value="">
+        <button onclick="connect()">Connect</button>
+        <p style="margin-top:15px;color:#666;font-size:12px;text-align:center;">
+            Enter the server address provided by your administrator
+        </p>
+    </div>
+    
+    <div class="container hidden" id="console-container">
+        <div class="window product">
+            <div class="window-header">
+                <div class="name">📋 Product Agent</div>
+                <div class="status" id="product-status">idle</div>
+            </div>
+            <div class="window-messages" id="product-messages"></div>
+            <div class="window-input">
+                <input id="product-input" placeholder="Send message..." onkeypress="if(event.key==='Enter')send('product')">
+                <button onclick="send('product')">Send</button>
+            </div>
+        </div>
+        
+        <div class="window architect">
+            <div class="window-header">
+                <div class="name">🏗️ Architect Agent</div>
+                <div class="status" id="architect-status">idle</div>
+            </div>
+            <div class="window-messages" id="architect-messages"></div>
+            <div class="window-input">
+                <input id="architect-input" placeholder="Send message..." onkeypress="if(event.key==='Enter')send('architect')">
+                <button onclick="send('architect')">Send</button>
+            </div>
+        </div>
+        
+        <div class="window developer">
+            <div class="window-header">
+                <div class="name">💻 Developer Agent</div>
+                <div class="status" id="developer-status">idle</div>
+            </div>
+            <div class="window-messages" id="developer-messages"></div>
+            <div class="window-input">
+                <input id="developer-input" placeholder="Send message..." onkeypress="if(event.key==='Enter')send('developer')">
+                <button onclick="send('developer')">Send</button>
+            </div>
+        </div>
+        
+        <div class="window reviewer">
+            <div class="window-header">
+                <div class="name">🔍 Reviewer Agent</div>
+                <div class="status" id="reviewer-status">idle</div>
+            </div>
+            <div class="window-messages" id="reviewer-messages"></div>
+            <div class="window-input">
+                <input id="reviewer-input" placeholder="Send message..." onkeypress="if(event.key==='Enter')send('reviewer')">
+                <button onclick="send('reviewer')">Send</button>
+            </div>
+        </div>
+        
+        <div class="window tester">
+            <div class="window-header">
+                <div class="name">🧪 Tester Agent</div>
+                <div class="status" id="tester-status">idle</div>
+            </div>
+            <div class="window-messages" id="tester-messages"></div>
+            <div class="window-input">
+                <input id="tester-input" placeholder="Send message..." onkeypress="if(event.key==='Enter')send('tester')">
+                <button onclick="send('tester')">Send</button>
+            </div>
+        </div>
+        
+        <div class="window system">
+            <div class="window-header">
+                <div class="name">📊 System Log</div>
+                <div class="status">monitoring</div>
+            </div>
+            <div class="window-messages" id="system-messages"></div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let serverUrl = '';
+        
+        function connect() {
+            serverUrl = document.getElementById('server-url').value.trim();
+            if (!serverUrl) {
+                alert('Please enter server address');
+                return;
+            }
+            
+            const wsProtocol = serverUrl.startsWith('https') ? 'wss' : 'ws';
+            const wsUrl = serverUrl.replace(/^https?/, wsProtocol) + '/ws';
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    document.getElementById('config-panel').classList.add('hidden');
+                    document.getElementById('console-container').classList.remove('hidden');
+                    addMsg('system', '✅ Connected to server', 'system');
+                };
+                
+                ws.onmessage = function(e) {
+                    const d = JSON.parse(e.data);
+                    if (d.type === 'msg') addMsg(d.agent, d.content, 'agent');
+                    else if (d.type === 'status') updateStatus(d.agent, d.status);
+                    else if (d.type === 'sys') addMsg('system', d.content, 'system');
+                };
+                
+                ws.onclose = function() {
+                    addMsg('system', '❌ Disconnected from server', 'system');
+                };
+                
+                ws.onerror = function() {
+                    alert('Connection failed. Please check server address.');
+                };
+                
+            } catch(e) {
+                alert('Invalid server address');
+            }
+        }
+        
+        function addMsg(agent, content, type) {
+            const container = document.getElementById(agent + '-messages');
+            if (!container) return;
+            
+            const div = document.createElement('div');
+            div.className = 'msg ' + type;
+            const time = new Date().toLocaleTimeString();
+            div.innerHTML = `<div>${escapeHtml(content.substring(0, 500))}${content.length > 500 ? '...' : ''}</div><div class="msg-time">${time}</div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function updateStatus(agent, status) {
+            const el = document.getElementById(agent + '-status');
+            if (el) {
+                el.textContent = status;
+                el.className = 'status' + (status === 'working' ? ' working' : '');
+            }
+        }
+        
+        function send(agent) {
+            const input = document.getElementById(agent + '-input');
+            const content = input.value.trim();
+            if (!content || !ws) return;
+            
+            ws.send(JSON.stringify({type: 'msg', agent: agent, content: content}));
+            addMsg(agent, content, 'user');
+            input.value = '';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
